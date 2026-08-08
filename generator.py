@@ -1,4 +1,4 @@
-import os, sys
+import os, re, sys
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from typing import NotRequired, TypedDict, Any
@@ -31,22 +31,42 @@ class Track(TypedDict):
     track: TrackItem
     
 
+def extract_playlist_id(value: str) -> str:
+    '''
+    Accepts a bare playlist id, a Spotify URI (spotify:playlist:<id>)
+    or an open.spotify.com playlist link (with or without query params)
+    and returns the bare playlist id.
+    '''
+    match = re.search(r"playlist[/:]([a-zA-Z0-9]+)", value)
+    if match:
+        return match.group(1)
+    return value.strip()
+
+
 def getAllTracks(user: spotipy.Spotify, limit_step=50):
     '''
-    Function to obtain all user tracks.\n
+    Function to obtain all tracks saved in the current user's library ("Liked Songs").\n
     returns list['href', 'items', 'limit', 'next', 'offset', 'previous', 'total']
     '''
     tracks: list[Track] = []
-    for off in range(0, 1000, limit_step):
-        response = user.current_user_saved_tracks(
-            limit=limit_step, offset=off
-        )
-        # print(type(response))
-        # print
-        # print(response)
-        if len(response) == 0:
-            break
+    response = user.current_user_saved_tracks(limit=limit_step)
+    while response:
         tracks.extend(response["items"])
+        response = user.next(response) if response.get("next") else None
+    return tracks
+
+
+def getPlaylistTracks(user: spotipy.Spotify, playlist_id: str, limit_step=100):
+    '''
+    Function to obtain all tracks of a given playlist (by id, URI or link).\n
+    Works for public, private and collaborative playlists the authenticated
+    user has access to.
+    '''
+    tracks: list[Track] = []
+    response = user.playlist_items(playlist_id, limit=limit_step)
+    while response:
+        tracks.extend(response["items"])
+        response = user.next(response) if response.get("next") else None
     return tracks
 
 
@@ -63,32 +83,32 @@ def checks_attributes(tracks: list[Track]):
 
 def main():
     load_dotenv()
-    scope = "user-library-read"
+    # user-library-read is needed for "Liked Songs", the playlist-read-*
+    # scopes are needed to read private/collaborative playlists by link.
+    scope = "user-library-read playlist-read-private playlist-read-collaborative"
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, client_id=os.getenv('SPOTIPY_CLIENT_ID'),client_secret=os.getenv('SPOTIPY_CLIENT_SECRET'),redirect_uri=os.getenv('SPOTIPY_REDIRECT_URI')))
 
-    tracks =  getAllTracks(sp)
-    # a = TrackItem.__annotations__
-    # a = TrackItem.__required_keys__
-    # print(a)
-    # print(type(a))
-    # types = checks_attributes(trakcs)
+    # Optional first CLI argument: playlist link, spotify:playlist:<id> URI or bare id.
+    # If omitted, falls back to the user's saved tracks ("Liked Songs").
+    playlist_arg = sys.argv[1] if len(sys.argv) > 1 else None
+
+    if playlist_arg:
+        tracks = getPlaylistTracks(sp, extract_playlist_id(playlist_arg))
+    else:
+        tracks = getAllTracks(sp)
 
     field_names = {"added_at"}.union(TrackItem.__required_keys__)
-    # with open(sys.stdout, "w") as csvfile:
     with sys.stdout as csvfile:
-        # writer = csv.writer(csvfile, delimiter=';',quotechar="|",quoting=csv.QUOTE_MINIMAL)
         writer = csv.DictWriter(csvfile, fieldnames=field_names,
                     delimiter=";")
         writer.writeheader()
         for track in tracks:
-            data = {"added_at": track["added_at"]} | (track["track"])
-            writer.writerow(data)
-            # print(data)
-
-    # results = sp.current_user_saved_tracks(limit=50)
-    # for idx, item in enumerate(results['items']):
-    #     track = item['track']
-    #     print(idx, track['artists'][0]['name'], " – ", track['name'])
+            track_data = track.get("track")
+            if not track_data:
+                # local files / unavailable items can have no track data
+                continue
+            data = {"added_at": track["added_at"]} | track_data
+            writer.writerow({k: data.get(k) for k in field_names})
 
 if __name__ == "__main__": 
     main()
