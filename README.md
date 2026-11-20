@@ -92,10 +92,10 @@ python generator.py
 Pass the playlist link (or `spotify:playlist:<id>` URI, or bare playlist id) as an argument:
 
 ```sh
-python spotifyObtainer.py https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+python spotifyObtainer.py https://open.spotify.com/playlist/<your_playlist_id>
 ```
 
-This works for playlists you own, playlists you follow, private playlists and collaborative playlists — as long as the logged-in account has access to them.
+This works for playlists you own, playlists you follow, private playlists and collaborative playlists — as long as the logged-in account has access to them. Use a playlist created by a user; Spotify-owned playlists are not available to new apps (see below).
 
 ## Output
 
@@ -119,3 +119,5 @@ The exit code is non-zero if the export fails.
 - Requires the `user-library-read`, `playlist-read-private` and `playlist-read-collaborative` scopes, requested automatically on first login.
 - Pagination is handled automatically, so libraries/playlists larger than one API page (50–100 items) are fully exported.
 - Local files added to your library/playlists (not available on Spotify's catalog) are skipped, since Spotify doesn't return track metadata for them.
+- **Spotify-owned playlists are not available.** Since Spotify's [November 2024 Web API changes](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api), apps created after that date (and apps in development mode) get a `404` when requesting Spotify-owned editorial and algorithmic playlists, such as "Today's Top Hits", "Discover Weekly" or "Daily Mix". Playlists created by users work normally. As a workaround, copy the playlist into one of your own and export that.
+- For the same reason, `preview_url` is empty (`null`) for new apps.
