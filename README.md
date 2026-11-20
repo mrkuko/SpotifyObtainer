@@ -10,7 +10,7 @@ The script:
 - creates a local `venv` virtual environment inside the repo folder,
 - installs its dependencies (`spotipy`, `python-dotenv`) into it,
 - authenticates with your Spotify account,
-- prints the resulting CSV to stdout, wrapped between `$BEGIN` and `$END` markers.
+- prints the resulting CSV to stdout (progress messages and errors go to stderr).
 
 ## Requirements
 
@@ -99,13 +99,11 @@ This works for playlists you own, playlists you follow, private playlists and co
 
 ## Output
 
-The CSV (`;`-delimited) is printed to stdout between markers:
+The CSV (`;`-delimited) is printed to stdout. Setup messages, pip output and errors go to stderr, so stdout is always a clean CSV:
 
 ```
-$BEGIN
 added_at;album;artists;...;uri
 2024-01-01T12:00:00Z;{...};[...];...;spotify:track:...
-$END
 ```
 
 Redirect stdout to a file if you want to save it, e.g.:
@@ -114,7 +112,7 @@ Redirect stdout to a file if you want to save it, e.g.:
 python spotifyObtainer.py > liked_songs.csv
 ```
 
-(Note: this will also include the `$BEGIN`/`$END` markers in the file — strip them if you need a clean CSV.)
+The exit code is non-zero if the export fails.
 
 ## Notes / limitations
 
