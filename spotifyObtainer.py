@@ -1,10 +1,9 @@
-import os,subprocess,sys,venv,sys
+import hashlib, os, subprocess, sys, venv
 
-PACKAGES = ["spotipy", "python-dotenv"]
 # All paths are resolved relative to this file, not the current directory,
 # so the script works no matter where it is launched from.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FLAGS: int = 0;
+REQUIREMENTS = os.path.join(BASE_DIR, "requirements.txt")
 
 # Determine the correct path based on the OS
 def get_venv_python(venv_dir: str):
@@ -24,10 +23,24 @@ def create_venv(venv_dir: str):
         print(f"Creating virtual environment in {venv_dir}", file=sys.stderr)
         venv.EnvBuilder(with_pip=True).create(venv_dir)
 
+def requirements_hash() -> str:
+    with open(REQUIREMENTS, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
 def install_packages(venv_dir: str):
+    # Skip pip (and the network round-trip) unless the venv is new or
+    # requirements.txt changed since the last successful install.
+    stamp = os.path.join(venv_dir, ".requirements.sha256")
+    current = requirements_hash()
+    if os.path.exists(stamp):
+        with open(stamp) as f:
+            if f.read().strip() == current:
+                return
     pip_path = get_venv_pip(venv_dir)
     # pip's output goes to stderr so stdout contains only the CSV
-    subprocess.check_call([pip_path, "install"] + PACKAGES, stdout=sys.stderr)
+    subprocess.check_call([pip_path, "install", "-r", REQUIREMENTS], stdout=sys.stderr)
+    with open(stamp, "w") as f:
+        f.write(current)
 
 def run_python(venv_dir: str, py_script: str):
     python_path = get_venv_python(venv_dir)
