@@ -255,7 +255,16 @@ def parse_args(argv: list[str]):
     return parser.parse_args(argv)
 
 
-def main():
+PLAYLIST_HELP = ("expected: a playlist link "
+                 "(https://open.spotify.com/playlist/<id>), a "
+                 "spotify:playlist:<id> URI or a 22-character id")
+
+
+def create_client() -> spotipy.Spotify:
+    '''
+    Loads .env and returns an authenticated Spotify client. Logging in
+    (browser window) only happens on the first API call.
+    '''
     load_dotenv(os.path.join(BASE_DIR, ".env"))
     # user-library-read is needed for "Liked Songs", the playlist-read-*
     # scopes are needed to read private/collaborative playlists by link.
@@ -268,53 +277,55 @@ def main():
         redirect_uri=os.getenv('SPOTIPY_REDIRECT_URI'),
         cache_path=os.path.join(BASE_DIR, ".cache"),
     )
-    sp = spotipy.Spotify(auth_manager=auth_manager)
+    return spotipy.Spotify(auth_manager=auth_manager)
 
-    # Optional playlist argument; if omitted, falls back to the user's saved
-    # tracks ("Liked Songs").
-    # Old version (kept for reference), before --episodes-out existed:
-    # playlist_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    args = parse_args(sys.argv[1:])
-    playlist_arg = args.playlist
 
-    if playlist_arg:
-        try:
-            playlist_id = extract_playlist_id(playlist_arg)
-        except ValueError as error:
-            print(f"error: {error}", file=sys.stderr)
-            print("expected: a playlist link "
-                  "(https://open.spotify.com/playlist/<id>), a "
-                  "spotify:playlist:<id> URI or a 22-character id",
-                  file=sys.stderr)
-            sys.exit(2)
-        items = get_playlist_tracks(sp, playlist_id)
+def fetch_export(sp: spotipy.Spotify, playlist: str | None = None):
+    '''
+    Fetches the items to export and returns (songs, episodes), both as lists
+    of flat dicts. playlist is a link, URI or id; None means "Liked Songs".
+    Raises ValueError if playlist is not a valid playlist reference.
+    Used by the CLI (main) and meant to be reused by a UI.
+    '''
+    if playlist:
+        items = get_playlist_tracks(sp, extract_playlist_id(playlist))
     else:
         items = get_all_tracks(sp)
+    return split_items(items)
+
+
+def write_episodes_file(path: str, episodes: list[dict]):
+    '''Writes the episodes CSV (UTF-8, ;-delimited) to the given path.'''
+    with open(path, "w", newline="", encoding="utf-8") as episodes_file:
+        write_csv(episodes_file, EpisodeItem, episodes)
+
+
+def main():
+    # Old version (kept for reference): everything below lived in this
+    # function (auth, playlist validation, fetching, splitting). It now lives
+    # in create_client(), fetch_export() and write_episodes_file() so a UI can
+    # reuse it; main() only handles the command line.
+    # Optional playlist argument; if omitted, falls back to the user's saved
+    # tracks ("Liked Songs").
+    # playlist_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    args = parse_args(sys.argv[1:])
+    sp = create_client()
+
+    try:
+        songs, episodes = fetch_export(sp, args.playlist)
+    except ValueError as error:
+        print(f"error: {error}", file=sys.stderr)
+        print(PLAYLIST_HELP, file=sys.stderr)
+        sys.exit(2)
 
     # The csv module writes its own line endings and expects the stream to
     # not translate them. Without this, Windows turns "\r\n" into "\r\r\n"
     # (a blank line between rows).
     sys.stdout.reconfigure(newline="")
-
-    # Old version (kept for reference): every item was written as a track
-    # row, so podcast episodes ended up as rows with most columns empty.
-    # field_names = ["added_at", *TrackItem.__annotations__]
-    # writer = csv.DictWriter(sys.stdout, fieldnames=field_names,
-    #                         delimiter=";")
-    # writer.writeheader()
-    # for track in tracks:
-    #     track_data = track.get("track")
-    #     if not track_data:
-    #         continue
-    #     data = {"added_at": track["added_at"]} | track_data
-    #     writer.writerow({k: to_cell(data.get(k)) for k in field_names})
-    songs, episodes = split_items(items)
     write_csv(sys.stdout, TrackItem, songs)
 
     if episodes and args.episodes_out:
-        with open(args.episodes_out, "w", newline="",
-                  encoding="utf-8") as episodes_file:
-            write_csv(episodes_file, EpisodeItem, episodes)
+        write_episodes_file(args.episodes_out, episodes)
         print(f"wrote {len(episodes)} episodes to {args.episodes_out}",
               file=sys.stderr)
     elif episodes:
