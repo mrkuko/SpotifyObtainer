@@ -97,7 +97,7 @@ def main():
     else:
         tracks = getAllTracks(sp)
 
-    field_names = {"added_at"}.union(TrackItem.__required_keys__)
+    field_names = ["added_at", *TrackItem.__annotations__]
     with sys.stdout as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=field_names,
                     delimiter=";")
