@@ -1,36 +1,80 @@
 # Spotify Obtainer
 
-A small script that uses the official [Spotify Web API](https://developer.spotify.com/documentation/web-api) (via [spotipy](https://spotipy.readthedocs.io/)) to export track metadata to CSV. It can export either:
-- your **Liked Songs** (saved tracks library), or
-- **any playlist you can access**, by pasting its Spotify link (public, private or collaborative, as long as your account has access to it).
+Export your Spotify **Liked Songs** or **any playlist** to a CSV file, from a small window or from the command line.
 
-> ⚠️ This tool only exports track **metadata** (title, artist, album, id, uri, duration, ...) to a CSV file — it does **not** download audio. Spotify's API does not provide audio files, and downloading streamed audio would violate Spotify's Terms of Service.
+![Spotify Obtainer window exporting a playlist](docs/images/ui-playlist.png)
 
-The script:
-- creates a local `venv` virtual environment inside the repo folder,
-- installs its dependencies (`spotipy`, `python-dotenv`) into it,
-- authenticates with your Spotify account,
-- prints the resulting CSV to stdout (progress messages and errors go to stderr).
+- Works with your Liked Songs and with any playlist your account can open (your own, followed, private or collaborative).
+- The CSV starts with readable columns: song, artists, album, date added, duration and link. The raw data follows after them.
+- Podcast episodes in a playlist go to their own CSV file.
+- It uses the official [Spotify Web API](https://developer.spotify.com/documentation/web-api) through [spotipy](https://spotipy.readthedocs.io/).
 
-## Requirements
+> **Note:** this exports **metadata only** (titles, artists, albums, links, ...). It does **not** download audio. The Spotify API does not provide audio, and downloading streams would break Spotify's Terms of Service.
 
-- Python 3.11+ (uses modern typing features)
-- A Spotify account
-- A Spotify Developer app (free, see below)
+## Contents
 
-## 1. Create a Spotify Developer app
+- [Quick start](#quick-start)
+- [Setup](#setup)
+  - [1. Requirements](#1-requirements)
+  - [2. Create a Spotify app](#2-create-a-spotify-app)
+  - [3. Create the `.env` file](#3-create-the-env-file)
+  - [4. First run and login](#4-first-run-and-login)
+- [Usage](#usage)
+  - [Window (graphical interface)](#window-graphical-interface)
+  - [Command line](#command-line)
+- [Output: what is in the CSV](#output-what-is-in-the-csv)
+- [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
+- [Project files](#project-files)
+- [License](#license)
 
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
+## Quick start
+
+If you have done this before, these are all the steps:
+
+```sh
+git clone https://github.com/mrkuko/SpotifyObtainer.git
+cd SpotifyObtainer
+cp .env.example .env                 # then fill in your Spotify app values
+python spotifyObtainer.py --ui       # window
+python spotifyObtainer.py > songs.csv   # or: command line, Liked Songs
+```
+
+If any of this is new, follow the setup below.
+
+## Setup
+
+### 1. Requirements
+
+- **Python 3.11 or newer**: check with `python --version`.
+- **A Spotify account.** A free account is fine.
+- **tkinter**, only for the window. It comes with Python on Windows and macOS and with most Linux distributions. If it is missing, see [Troubleshooting](#troubleshooting).
+
+You do not need to install any packages yourself. The first run creates a `venv` folder and installs everything from [requirements.txt](requirements.txt).
+
+### 2. Create a Spotify app
+
+Spotify only lets programs read your library through an "app" that you register. It's free and takes two minutes:
+
+1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
 2. Click **Create app**.
-3. Fill in a name/description, select **Web API** when asked which APIs you're using.
-4. Add a **Redirect URI**. As of Spotify's [2025 security update](https://developer.spotify.com/blog/2025-02-12-increasing-the-security-requirements-for-integrating-with-spotify), `localhost` is **no longer accepted**. Use one of:
-   - `http://127.0.0.1:8888/callback` (loopback address, HTTP is allowed here), or
-   - an `https://...` URL you control.
-5. Save the app, then open **Settings** to copy the **Client ID** and **Client secret**.
+3. Fill in any name and description. When asked which APIs you use, select **Web API**.
+4. Under **Redirect URIs**, add:
+   ```
+   http://127.0.0.1:8888/callback
+   ```
+   Use `127.0.0.1`, **not** `localhost`. Since Spotify's [2025 security update](https://developer.spotify.com/blog/2025-02-12-increasing-the-security-requirements-for-integrating-with-spotify), `localhost` is rejected. Any free port works instead of `8888`, as long as you use the same one in `.env`.
+5. Save. Open the app's **Settings**, where you find the **Client ID** and, under **View client secret**, the **Client secret**.
 
-## 2. Configure environment variables
+New apps start in **Development mode**. That's fine for personal use: you (the app owner) can log in. To let someone else use your app, add their Spotify account under **User Management**.
 
-Create a `.env` file in the repo root:
+### 3. Create the `.env` file
+
+The program reads your app's details from a file named `.env` in the project folder, next to `spotifyObtainer.py`. Copy the template and fill it in:
+
+```sh
+cp .env.example .env
+```
 
 ```sh
 SPOTIPY_CLIENT_ID=your_client_id_here
@@ -38,101 +82,82 @@ SPOTIPY_CLIENT_SECRET=your_client_secret_here
 SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
 ```
 
-The redirect URI must exactly match the one registered in the dashboard.
+| Variable | Where to find it |
+|---|---|
+| `SPOTIPY_CLIENT_ID` | App settings → **Client ID** |
+| `SPOTIPY_CLIENT_SECRET` | App settings → **View client secret** |
+| `SPOTIPY_REDIRECT_URI` | Must be **exactly** one of the app's **Redirect URIs**: same `http`, same `127.0.0.1`, same port, same `/callback` |
 
-## 3. Set up the environment
+> **Keep `.env` private.** It contains your client secret. It is listed in `.gitignore`, so git will not commit it. Don't share it or post screenshots of it.
 
-You can either let the script set itself up automatically, or do it manually.
+### 4. First run and login
 
-### Option A: automatic (recommended)
+On the first run, the program:
 
-Just run [spotifyObtainer.py](spotifyObtainer.py) (see below) — on first run it creates a `venv` folder and installs the dependencies for you.
+1. creates the `venv` folder and installs the dependencies (this takes a moment, and output goes to the terminal),
+2. opens your **web browser** with a Spotify login page; you approve access to your library, and the browser shows a short confirmation,
+3. saves the login in a `.cache` file next to the script, so later runs don't ask again.
 
-### Option B: manual
+`.cache` holds your login token. Treat it like a password. It is ignored by git, and deleting it simply means you log in again.
 
-```sh
-python -m venv venv
-```
+## Usage
 
-Activate it:
-
-```sh
-# Windows (PowerShell)
-.\venv\Scripts\Activate.ps1
-# Linux / macOS
-source venv/bin/activate
-```
-
-Then install dependencies:
-
-```sh
-pip install -r requirements.txt
-```
-
-## 4. Run it
-
-The first run of [spotifyObtainer.py](spotifyObtainer.py) will:
-- create the `venv` folder (`python -m venv venv`) and install dependencies, if not already done,
-- open a browser window asking you to log in and authorize the app (a one-time step; spotipy caches the token in a local `.cache` file afterwards).
-
-### Export your Liked Songs
-
-```sh
-python spotifyObtainer.py
-```
-
-If you set up the venv manually (Option B), you can instead run [generator.py](generator.py) directly inside the activated venv:
-
-```sh
-python generator.py
-```
-
-### Export a specific playlist by link
-
-Pass the playlist link (or `spotify:playlist:<id>` URI, or bare playlist id) as an argument:
-
-```sh
-python spotifyObtainer.py https://open.spotify.com/playlist/<your_playlist_id>
-```
-
-This works for playlists you own, playlists you follow, private playlists and collaborative playlists — as long as the logged-in account has access to them. Use a playlist created by a user; Spotify-owned playlists are not available to new apps (see below).
-
-### Graphical interface
+### Window (graphical interface)
 
 ```sh
 python spotifyObtainer.py --ui
 ```
 
-Opens a window (built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)) that does the same as the command line: choose **Liked Songs** or paste a **playlist** link, pick where to save the songs file and, for playlists, an optional separate file for podcast episodes, then click **Export**. The first export opens a browser window for the Spotify login, just like the command line. The **Browse...** buttons open your desktop's own save dialog (on Linux this uses `kdialog` on KDE or `zenity` elsewhere, if installed; otherwise Tk's built-in dialog). It needs tkinter, which comes with most Python installs (on some Linux distributions it is a separate package, for example `python3-tk`).
+**Liked Songs:** pick where to save the file and click **Export**. No link needed.
 
-### Playlists that contain podcast episodes
+![Liked Songs mode](docs/images/ui-liked-songs.png)
 
-Playlists can mix songs and podcast episodes. Episodes have different fields than songs, so they never go into the songs CSV. Pass `--episodes-out` to write them to their own file:
+**Playlist:** switch to **Playlist** and paste the playlist link. To get the link in Spotify, open the playlist, click **⋯ → Share → Copy link to playlist**. Choose the songs file and, if the playlist has podcast episodes, optionally an episodes file. If you leave the episodes file empty, episodes are skipped.
+
+![Playlist mode with an export finished](docs/images/ui-playlist.png)
+
+Some details:
+
+- **Browse...** opens your desktop's own save dialog. On Linux it uses `kdialog` (KDE) or `zenity` if one of them is installed; otherwise it falls back to a simpler built-in dialog. On KDE, install `kdialog` to get the native KDE dialog.
+- Text fields support **Ctrl+A / Ctrl+C / Ctrl+V / Ctrl+X** and a **right-click menu**. You can select and copy the log too.
+- If you paste the link of your Liked Songs page (`open.spotify.com/collection/tracks`) into the playlist field, the window switches to Liked Songs.
+
+### Command line
+
+The CSV is printed to the terminal (stdout). Use `>` to save it to a file. Messages and errors go to stderr, so they never end up in the file.
+
+| What | Command |
+|---|---|
+| Liked Songs | `python spotifyObtainer.py > liked-songs.csv` |
+| A playlist | `python spotifyObtainer.py https://open.spotify.com/playlist/<id> > playlist.csv` |
+| Playlist, episodes to their own file | `python spotifyObtainer.py <link> --episodes-out episodes.csv > songs.csv` |
+| Open the window | `python spotifyObtainer.py --ui` |
+| Show the version | `python spotifyObtainer.py --version` |
+| Show all options | `python spotifyObtainer.py --help` |
+
+The playlist argument can be a link (`https://open.spotify.com/playlist/<id>`, with or without `?si=...`), a URI (`spotify:playlist:<id>`) or the bare 22-character id. Anything else, such as an album or track link, is rejected with a clear message and exit code `2`.
+
+Without `--episodes-out`, podcast episodes in a playlist are skipped, and a note like `skipped 3 episodes` is printed. Liked Songs never contain episodes. The exit code is non-zero whenever the export fails.
+
+<details>
+<summary>Setting up the venv by hand (optional)</summary>
+
+`spotifyObtainer.py` creates and updates `venv` automatically. It reinstalls only when `requirements.txt` changes. If you prefer to manage it yourself:
 
 ```sh
-python spotifyObtainer.py https://open.spotify.com/playlist/<your_playlist_id> --episodes-out episodes.csv > songs.csv
+python -m venv venv
+source venv/bin/activate            # Windows (PowerShell): .\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python generator.py --help          # generator.py takes the same arguments
 ```
 
-Without `--episodes-out`, episodes are skipped and a message like `skipped 3 episodes (use --episodes-out FILE to export them)` is printed to stderr. Your Liked Songs cannot contain episodes, so the flag has no effect there (no file is created).
+</details>
 
-## Output
+## Output: what is in the CSV
 
-The CSV (`;`-delimited) is printed to stdout. Setup messages, pip output and errors go to stderr, so stdout is always a clean CSV:
+The files are `;`-separated and UTF-8. They open in LibreOffice Calc, Excel (choose `;` as the separator) or any text editor.
 
-```
-added_at;album;artists;...;uri
-2024-01-01T12:00:00Z;{...};[...];...;spotify:track:...
-```
-
-Redirect stdout to a file if you want to save it, e.g.:
-
-```sh
-python spotifyObtainer.py > liked_songs.csv
-```
-
-The exit code is non-zero if the export fails.
-
-The songs file starts with readable columns, so you can open it in a spreadsheet or text editor and see your music right away:
+The **songs** file starts with the columns you usually want:
 
 | Column | Example |
 |---|---|
@@ -143,15 +168,42 @@ The songs file starts with readable columns, so you can open it in a spreadsheet
 | `duration` | `5:09` |
 | `url` | `https://open.spotify.com/track/...` |
 
-After these come simple values (`id`, `uri`, `popularity`, `explicit`, `duration_ms`, ...) and, at the end, the raw data as JSON inside the cell (`album`, `artists`, `external_ids`, `external_urls`). `linked_from` and `restrictions` are only filled when Spotify returns them. `available_markets` (a list of around 180 countries per song) is not exported.
+Then come simple values (`explicit`, `popularity`, `track_number`, `duration_ms`, `id`, `uri`, ...), and at the end the raw data as JSON inside the cell (`album`, `artists`, `external_ids`, `external_urls`). `linked_from` and `restrictions` are only filled when Spotify sends them. `available_markets`, a list of about 180 countries per song, is left out.
 
-The episodes file follows the same idea: `name`, `show_name`, `release_date`, `added_at`, `duration`, `url`, then the details (`description`, `language`, ...) and the raw JSON (`show`, `images`, ...).
+The **episodes** file follows the same idea: `name`, `show_name`, `release_date`, `added_at`, `duration`, `url`, then details (`description`, `language`, ...) and raw JSON (`show`, `images`, ...).
 
-## Notes / limitations
+## Troubleshooting
 
-- Requires the `user-library-read`, `playlist-read-private` and `playlist-read-collaborative` scopes, requested automatically on first login.
-- Pagination is handled automatically, so libraries/playlists larger than one API page (50–100 items) are fully exported.
-- Podcast episodes inside playlists go to a separate CSV, see `--episodes-out` above.
-- Local files added to your library/playlists (not available on Spotify's catalog) are skipped, since Spotify doesn't return track metadata for them.
-- **Spotify-owned playlists are not available.** Since Spotify's [November 2024 Web API changes](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api), apps created after that date (and apps in development mode) get a `404` when requesting Spotify-owned editorial and algorithmic playlists, such as "Today's Top Hits", "Discover Weekly" or "Daily Mix". Playlists created by users work normally. As a workaround, copy the playlist into one of your own and export that.
-- For the same reason, `preview_url` is empty (`null`) for new apps.
+| You see | Cause | Fix |
+|---|---|---|
+| Browser page: `redirect_uri: Not matching configuration` | `SPOTIPY_REDIRECT_URI` in `.env` differs from the app's Redirect URIs, often `localhost` instead of `127.0.0.1` or a different port | Make both **exactly** the same, see [step 3](#3-create-the-env-file) |
+| Browser page: `INVALID_CLIENT` | Wrong Client ID or secret in `.env` | Copy both again from the app settings |
+| The wrong browser opens | The `BROWSER` environment variable overrides your desktop's default browser (Linux: check `/etc/environment`, `~/.profile`) | Remove or change `BROWSER`, then log out and back in. To test without it: `env -u BROWSER python spotifyObtainer.py --ui` |
+| `error while loading shared libraries: libpython3.x.so` or pip fails with exit status 127 | The `venv` was made with a Python version that is no longer installed, for example after a system upgrade | Delete the folder (`rm -rf venv`) and run again. It is recreated automatically |
+| `No module named 'tkinter'` / `_tkinter` with `--ui` | Your Python has no Tk support | Install it, for example `sudo apt install python3-tk` (Debian/Ubuntu) or `sudo dnf install python3-tkinter` (Fedora). On Arch it comes with `python` |
+| `error: not a Spotify playlist id, URI or link` | An album, track or other link was given | Use a playlist link: **⋯ → Share → Copy link to playlist** |
+| `404` for a playlist | The playlist is Spotify-owned (see [Limitations](#limitations)), or your account cannot open it | Use a playlist created by a user, or copy the songs into your own playlist |
+| You want to log in with a different account | The login is cached in `.cache` | Delete `.cache` and run again |
+
+## Limitations
+
+- **Spotify-owned playlists cannot be read.** Since Spotify's [November 2024 Web API changes](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api), apps created after that date (and apps in development mode) get a `404` for Spotify's editorial and algorithmic playlists, such as "Today's Top Hits", "Discover Weekly" or "Daily Mix". Playlists made by users work. As a workaround, copy the songs into a playlist of your own and export that.
+- For the same reason, `preview_url` is always empty for new apps.
+- **Local files** you added to Spotify are skipped, because Spotify sends no data for them.
+- Requested permissions are read-only: `user-library-read`, `playlist-read-private` and `playlist-read-collaborative`.
+
+## Project files
+
+| File | What it does |
+|---|---|
+| [spotifyObtainer.py](spotifyObtainer.py) | Entry point. Creates and updates `venv`, then runs `generator.py` with your arguments |
+| [generator.py](generator.py) | Talks to Spotify, writes the CSV, command-line options |
+| [ui.py](ui.py) | The window (CustomTkinter) |
+| [dialogs.py](dialogs.py) | Native save dialogs (`kdialog` / `zenity`, Tk fallback) |
+| [textedit.py](textedit.py) | Ctrl+A, right-click menu and copy support for text fields |
+| [.env.example](.env.example) | Template for your `.env` |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each version |
+
+## License
+
+[GNU General Public License v3.0](LICENSE).

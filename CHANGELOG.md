@@ -20,6 +20,9 @@ version is 0, a minor bump (`0.x.0`) may contain breaking changes.
 
 ### Added
 
+- README rewritten as a step-by-step guide (Spotify app, `.env`, first login,
+  window and command line, CSV columns, troubleshooting) with screenshots in
+  `docs/images/`, and a `.env.example` template.
 - Graphical interface (CustomTkinter): `python spotifyObtainer.py --ui`.
   Same features as the command line: Liked Songs or a playlist, a songs
   file and an optional separate episodes file. Only the options that fit
