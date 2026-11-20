@@ -97,6 +97,16 @@ python spotifyObtainer.py https://open.spotify.com/playlist/<your_playlist_id>
 
 This works for playlists you own, playlists you follow, private playlists and collaborative playlists — as long as the logged-in account has access to them. Use a playlist created by a user; Spotify-owned playlists are not available to new apps (see below).
 
+### Playlists that contain podcast episodes
+
+Playlists can mix songs and podcast episodes. Episodes have different fields than songs, so they never go into the songs CSV. Pass `--episodes-out` to write them to their own file:
+
+```sh
+python spotifyObtainer.py https://open.spotify.com/playlist/<your_playlist_id> --episodes-out episodes.csv > songs.csv
+```
+
+Without `--episodes-out`, episodes are skipped and a message like `skipped 3 episodes (use --episodes-out FILE to export them)` is printed to stderr. Your Liked Songs cannot contain episodes, so the flag has no effect there (no file is created).
+
 ## Output
 
 The CSV (`;`-delimited) is printed to stdout. Setup messages, pip output and errors go to stderr, so stdout is always a clean CSV:
@@ -114,10 +124,13 @@ python spotifyObtainer.py > liked_songs.csv
 
 The exit code is non-zero if the export fails.
 
+Nested values (`album`, `artists`, `external_urls`, ...) are written as JSON inside the cell. The last two song columns, `linked_from` and `restrictions`, are only filled when Spotify returns them. The episodes file has its own columns (`show`, `description`, `release_date`, ...).
+
 ## Notes / limitations
 
 - Requires the `user-library-read`, `playlist-read-private` and `playlist-read-collaborative` scopes, requested automatically on first login.
 - Pagination is handled automatically, so libraries/playlists larger than one API page (50–100 items) are fully exported.
+- Podcast episodes inside playlists go to a separate CSV, see `--episodes-out` above.
 - Local files added to your library/playlists (not available on Spotify's catalog) are skipped, since Spotify doesn't return track metadata for them.
 - **Spotify-owned playlists are not available.** Since Spotify's [November 2024 Web API changes](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api), apps created after that date (and apps in development mode) get a `404` when requesting Spotify-owned editorial and algorithmic playlists, such as "Today's Top Hits", "Discover Weekly" or "Daily Mix". Playlists created by users work normally. As a workaround, copy the playlist into one of your own and export that.
 - For the same reason, `preview_url` is empty (`null`) for new apps.
