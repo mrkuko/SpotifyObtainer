@@ -249,6 +249,9 @@ def parse_args(argv: list[str]):
         help="playlist link, spotify:playlist:<id> URI or bare id "
              "(default: your Liked Songs)")
     parser.add_argument(
+        "--ui", action="store_true",
+        help="open the graphical interface instead of printing CSV")
+    parser.add_argument(
         "--episodes-out", metavar="FILE",
         help="write podcast episodes found in the playlist to this CSV "
              "file (otherwise they are skipped)")
@@ -309,6 +312,11 @@ def main():
     # tracks ("Liked Songs").
     # playlist_arg = sys.argv[1] if len(sys.argv) > 1 else None
     args = parse_args(sys.argv[1:])
+    if args.ui:
+        # Imported here so the command line works without customtkinter.
+        import ui
+        ui.run()
+        return
     sp = create_client()
 
     try:

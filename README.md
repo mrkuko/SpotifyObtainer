@@ -97,6 +97,14 @@ python spotifyObtainer.py https://open.spotify.com/playlist/<your_playlist_id>
 
 This works for playlists you own, playlists you follow, private playlists and collaborative playlists — as long as the logged-in account has access to them. Use a playlist created by a user; Spotify-owned playlists are not available to new apps (see below).
 
+### Graphical interface
+
+```sh
+python spotifyObtainer.py --ui
+```
+
+Opens a window (built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)) that does the same as the command line: choose **Liked Songs** or paste a **playlist** link, pick where to save the songs file and, for playlists, an optional separate file for podcast episodes, then click **Export**. The first export opens a browser window for the Spotify login, just like the command line. The **Browse...** buttons open your desktop's own save dialog (on Linux this uses `kdialog` on KDE or `zenity` elsewhere, if installed; otherwise Tk's built-in dialog). It needs tkinter, which comes with most Python installs (on some Linux distributions it is a separate package, for example `python3-tk`).
+
 ### Playlists that contain podcast episodes
 
 Playlists can mix songs and podcast episodes. Episodes have different fields than songs, so they never go into the songs CSV. Pass `--episodes-out` to write them to their own file:

@@ -5,6 +5,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versions follow [Semantic Versioning](https://semver.org/). While the major
 version is 0, a minor bump (`0.x.0`) may contain breaking changes.
 
+## [Unreleased]
+
+### Added
+
+- Graphical interface (CustomTkinter): `python spotifyObtainer.py --ui`.
+  Same features as the command line: Liked Songs or a playlist, a songs
+  file and an optional separate episodes file. Only the options that fit
+  the chosen mode are shown, with a hint for each, and a pasted link to the
+  Liked Songs page is understood.
+- Browse buttons open the desktop's native save dialog (`kdialog` on KDE,
+  `zenity` elsewhere on Linux; Windows and macOS already use theirs).
+- Text fields: Ctrl+A selects all, a right-click menu (cut / copy / paste /
+  select all), Ctrl+A/C/V/X on any keyboard layout, and the log can be
+  selected and copied.
+- `export_to_files()` in `ui.py`, built on the refactored `create_client()`,
+  `fetch_export()` and `write_episodes_file()` in `generator.py`.
+
 ## [0.3.0] - 2026-11-20
 
 Big cleanup release after a long pause. **The output format changed**, so
