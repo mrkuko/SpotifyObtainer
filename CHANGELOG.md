@@ -7,6 +7,17 @@ version is 0, a minor bump (`0.x.0`) may contain breaking changes.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **CSV columns changed.** The songs file now starts with readable columns
+  (`name`, `artist_names`, `album_name`, `added_at`, `duration`, `url`),
+  followed by simple values and, last, the raw JSON columns. The episodes
+  file got the same treatment (`name`, `show_name`, `release_date`, ...).
+  Anything that read columns by position needs updating.
+- `available_markets` is no longer exported (neither as a column nor inside
+  the `album` JSON). Together with the new order this makes the songs file
+  about half the size.
+
 ### Added
 
 - Graphical interface (CustomTkinter): `python spotifyObtainer.py --ui`.

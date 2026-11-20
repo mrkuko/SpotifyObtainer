@@ -132,7 +132,20 @@ python spotifyObtainer.py > liked_songs.csv
 
 The exit code is non-zero if the export fails.
 
-Nested values (`album`, `artists`, `external_urls`, ...) are written as JSON inside the cell. The last two song columns, `linked_from` and `restrictions`, are only filled when Spotify returns them. The episodes file has its own columns (`show`, `description`, `release_date`, ...).
+The songs file starts with readable columns, so you can open it in a spreadsheet or text editor and see your music right away:
+
+| Column | Example |
+|---|---|
+| `name` | `DEVOLUTION` |
+| `artist_names` | `STARSET` (several artists: `A, B`) |
+| `album_name` | `HORIZONS` |
+| `added_at` | `2026-10-13T07:27:24Z` |
+| `duration` | `5:09` |
+| `url` | `https://open.spotify.com/track/...` |
+
+After these come simple values (`id`, `uri`, `popularity`, `explicit`, `duration_ms`, ...) and, at the end, the raw data as JSON inside the cell (`album`, `artists`, `external_ids`, `external_urls`). `linked_from` and `restrictions` are only filled when Spotify returns them. `available_markets` (a list of around 180 countries per song) is not exported.
+
+The episodes file follows the same idea: `name`, `show_name`, `release_date`, `added_at`, `duration`, `url`, then the details (`description`, `language`, ...) and the raw JSON (`show`, `images`, ...).
 
 ## Notes / limitations
 

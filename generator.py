@@ -228,12 +228,82 @@ def split_items(items: list[dict]):
     return tracks, episodes
 
 
+# Columns of the CSV files, in order. Readable columns come first (so the
+# song name is the first thing you see in a spreadsheet or editor), then
+# simple values, then the raw JSON blobs at the end.
+# available_markets (around 180 country codes per song, and a copy of it
+# inside "album") is not exported at all: it made up most of the file size
+# and nobody reads it.
+SONG_COLUMNS = [
+    # readable
+    "name", "artist_names", "album_name", "added_at", "duration", "url",
+    # simple values
+    "explicit", "popularity", "track_number", "disc_number", "duration_ms",
+    "id", "uri", "type", "is_local", "is_playable", "href", "preview_url",
+    # raw JSON
+    "album", "artists", "external_ids", "external_urls", "linked_from",
+    "restrictions",
+]
+EPISODE_COLUMNS = [
+    # readable
+    "name", "show_name", "release_date", "added_at", "duration", "url",
+    # simple values
+    "explicit", "language", "duration_ms", "id", "uri", "type",
+    "is_playable", "is_externally_hosted", "release_date_precision", "href",
+    "audio_preview_url",
+    # longer text and raw JSON
+    "description", "languages", "images", "show", "external_urls",
+    "restrictions",
+]
+COLUMNS = {TrackItem: SONG_COLUMNS, EpisodeItem: EPISODE_COLUMNS}
+
+
+def format_duration(milliseconds) -> str:
+    '''210000 -> "3:30", 3723000 -> "1:02:03", missing -> "".'''
+    if not isinstance(milliseconds, (int, float)):
+        return ""
+    total = int(milliseconds) // 1000
+    hours, rest = divmod(total, 3600)
+    minutes, seconds = divmod(rest, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes}:{seconds:02d}"
+
+
+def add_readable_fields(row: dict) -> dict:
+    '''
+    Returns a copy of the row with the readable columns filled in:
+    artist_names, album_name, show_name (episodes), duration and url.
+    available_markets is removed from the nested album as well.
+    '''
+    out = dict(row)
+    artists = row.get("artists") or []
+    out["artist_names"] = ", ".join(
+        a.get("name") or "" for a in artists if isinstance(a, dict))
+    album = row.get("album")
+    if isinstance(album, dict):
+        out["album_name"] = album.get("name") or ""
+        out["album"] = {k: v for k, v in album.items()
+                        if k != "available_markets"}
+    show = row.get("show")
+    if isinstance(show, dict):
+        out["show_name"] = show.get("name") or ""
+    out["duration"] = format_duration(row.get("duration_ms"))
+    out["url"] = (row.get("external_urls") or {}).get("spotify") or ""
+    return out
+
+
 def write_csv(stream, item_type: type, rows: list[dict]):
     '''Writes rows as ;-delimited CSV, columns in a fixed order.'''
-    field_names = ["added_at", *item_type.__annotations__]
+    # Old version (kept for reference): the columns were simply the API
+    # fields in the order of the TypedDict, so the song name was column 14,
+    # behind several huge JSON columns.
+    # field_names = ["added_at", *item_type.__annotations__]
+    field_names = COLUMNS[item_type]
     writer = csv.DictWriter(stream, fieldnames=field_names, delimiter=";")
     writer.writeheader()
     for row in rows:
+        row = add_readable_fields(row)
         writer.writerow({k: to_cell(row.get(k)) for k in field_names})
     stream.flush()
 
