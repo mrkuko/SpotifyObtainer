@@ -1,11 +1,10 @@
 .cache
 .env
 venv/*
-README*
 __pycache__
 
 # Notes and random stuff
 /garbage
 
 # Output files
-out.csv
+*.csv
