@@ -1,9 +1,13 @@
-import json, os, re, sys
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
-from typing import TypedDict, Any
 import csv
+import json
+import os
+import re
+import sys
+from typing import Any, TypedDict
+
+import spotipy
 from dotenv import load_dotenv
+from spotipy.oauth2 import SpotifyOAuth
 
 
 # .env and the spotipy token cache live next to this file, not in the cwd.
@@ -30,10 +34,11 @@ class TrackItem(TypedDict):
     type: str
     uri: str
 
+
 class Track(TypedDict):
     added_at: str
     track: TrackItem
-    
+
 
 def extract_playlist_id(value: str) -> str:
     '''
@@ -51,7 +56,7 @@ def _paginate(user: spotipy.Spotify, first_page) -> list[Track]:
     '''
     Follows the "next" links of a paged Spotify response, starting from
     first_page, and returns the items of all pages in one list.
-    Shared by getAllTracks and getPlaylistTracks (they had the same loop).
+    Shared by get_all_tracks and get_playlist_tracks (same loop in both).
     '''
     tracks: list[Track] = []
     response = first_page
@@ -61,9 +66,11 @@ def _paginate(user: spotipy.Spotify, first_page) -> list[Track]:
     return tracks
 
 
-def getAllTracks(user: spotipy.Spotify, limit_step=50):
+# Renamed from getAllTracks / getPlaylistTracks to snake_case (PEP 8).
+def get_all_tracks(user: spotipy.Spotify, limit_step=50):
     '''
-    Function to obtain all tracks saved in the current user's library ("Liked Songs").\n
+    Function to obtain all tracks saved in the current user's library
+    ("Liked Songs").\n
     returns list of saved-track items: {"added_at": ..., "track": {...}}
     '''
     # Old version (kept for reference), now handled by _paginate():
@@ -73,10 +80,12 @@ def getAllTracks(user: spotipy.Spotify, limit_step=50):
     #     tracks.extend(response["items"])
     #     response = user.next(response) if response.get("next") else None
     # return tracks
-    return _paginate(user, user.current_user_saved_tracks(limit=limit_step))
+    first_page = user.current_user_saved_tracks(limit=limit_step)
+    return _paginate(user, first_page)
 
 
-def getPlaylistTracks(user: spotipy.Spotify, playlist_id: str, limit_step=100):
+def get_playlist_tracks(user: spotipy.Spotify, playlist_id: str,
+                        limit_step=100):
     '''
     Function to obtain all tracks of a given playlist (by id, URI or link).\n
     Works for public, private and collaborative playlists the authenticated
@@ -89,7 +98,8 @@ def getPlaylistTracks(user: spotipy.Spotify, playlist_id: str, limit_step=100):
     #     tracks.extend(response["items"])
     #     response = user.next(response) if response.get("next") else None
     # return tracks
-    return _paginate(user, user.playlist_items(playlist_id, limit=limit_step))
+    first_page = user.playlist_items(playlist_id, limit=limit_step)
+    return _paginate(user, first_page)
 
 
 def to_cell(value: Any):
@@ -120,22 +130,31 @@ def main():
     load_dotenv(os.path.join(BASE_DIR, ".env"))
     # user-library-read is needed for "Liked Songs", the playlist-read-*
     # scopes are needed to read private/collaborative playlists by link.
-    scope = "user-library-read playlist-read-private playlist-read-collaborative"
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, client_id=os.getenv('SPOTIPY_CLIENT_ID'),client_secret=os.getenv('SPOTIPY_CLIENT_SECRET'),redirect_uri=os.getenv('SPOTIPY_REDIRECT_URI'),cache_path=os.path.join(BASE_DIR, ".cache")))
+    scope = ("user-library-read playlist-read-private "
+             "playlist-read-collaborative")
+    auth_manager = SpotifyOAuth(
+        scope=scope,
+        client_id=os.getenv('SPOTIPY_CLIENT_ID'),
+        client_secret=os.getenv('SPOTIPY_CLIENT_SECRET'),
+        redirect_uri=os.getenv('SPOTIPY_REDIRECT_URI'),
+        cache_path=os.path.join(BASE_DIR, ".cache"),
+    )
+    sp = spotipy.Spotify(auth_manager=auth_manager)
 
-    # Optional first CLI argument: playlist link, spotify:playlist:<id> URI or bare id.
+    # Optional first CLI argument: playlist link, spotify:playlist:<id> URI
+    # or bare id.
     # If omitted, falls back to the user's saved tracks ("Liked Songs").
     playlist_arg = sys.argv[1] if len(sys.argv) > 1 else None
 
     if playlist_arg:
-        tracks = getPlaylistTracks(sp, extract_playlist_id(playlist_arg))
+        tracks = get_playlist_tracks(sp, extract_playlist_id(playlist_arg))
     else:
-        tracks = getAllTracks(sp)
+        tracks = get_all_tracks(sp)
 
     field_names = ["added_at", *TrackItem.__annotations__]
     with sys.stdout as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=field_names,
-                    delimiter=";")
+                                delimiter=";")
         writer.writeheader()
         for track in tracks:
             track_data = track.get("track")
@@ -145,5 +164,6 @@ def main():
             data = {"added_at": track["added_at"]} | track_data
             writer.writerow({k: to_cell(data.get(k)) for k in field_names})
 
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
     main()
