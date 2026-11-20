@@ -1,4 +1,4 @@
-import os, re, sys
+import json, os, re, sys
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from typing import NotRequired, TypedDict, Any
@@ -74,6 +74,17 @@ def getPlaylistTracks(user: spotipy.Spotify, playlist_id: str, limit_step=100):
     return tracks
 
 
+def to_cell(value: Any):
+    '''
+    Nested values (dicts / lists such as album, artists, external_urls) are
+    written as compact JSON so they can be parsed back with any JSON parser.
+    Scalars are left to the csv module as-is.
+    '''
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return value
+
+
 def checks_attributes(tracks: list[Track]):
     types: dict[str, set[str]] = {}
     for track in tracks:
@@ -112,7 +123,7 @@ def main():
                 # local files / unavailable items can have no track data
                 continue
             data = {"added_at": track["added_at"]} | track_data
-            writer.writerow({k: data.get(k) for k in field_names})
+            writer.writerow({k: to_cell(data.get(k)) for k in field_names})
 
 if __name__ == "__main__": 
     main()
