@@ -152,17 +152,23 @@ def main():
         tracks = get_all_tracks(sp)
 
     field_names = ["added_at", *TrackItem.__annotations__]
-    with sys.stdout as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=field_names,
-                                delimiter=";")
-        writer.writeheader()
-        for track in tracks:
-            track_data = track.get("track")
-            if not track_data:
-                # local files / unavailable items can have no track data
-                continue
-            data = {"added_at": track["added_at"]} | track_data
-            writer.writerow({k: to_cell(data.get(k)) for k in field_names})
+    # The csv module writes its own line endings and expects the stream to
+    # not translate them. Without this, Windows turns "\r\n" into "\r\r\n"
+    # (a blank line between rows).
+    sys.stdout.reconfigure(newline="")
+
+    csvfile = sys.stdout
+    writer = csv.DictWriter(csvfile, fieldnames=field_names,
+                            delimiter=";")
+    writer.writeheader()
+    for track in tracks:
+        track_data = track.get("track")
+        if not track_data:
+            # local files / unavailable items can have no track data
+            continue
+        data = {"added_at": track["added_at"]} | track_data
+        writer.writerow({k: to_cell(data.get(k)) for k in field_names})
+    csvfile.flush()
 
 
 if __name__ == "__main__":
