@@ -6,17 +6,29 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REQUIREMENTS = os.path.join(BASE_DIR, "requirements.txt")
 
 # Determine the correct path based on the OS
+def get_venv_bin(venv_dir: str, name: str):
+    # Windows keeps executables in Scripts/, Unix-based systems (Linux, macOS) in bin/
+    folder = 'Scripts' if os.name == 'nt' else 'bin'
+    return os.path.join(venv_dir, folder, name)
+
 def get_venv_python(venv_dir: str):
-    if os.name == 'nt':  # Windows
-        return os.path.join(venv_dir, 'Scripts', 'python')
-    else:  # Unix-based (Linux, macOS)
-        return os.path.join(venv_dir, 'bin', 'python')
+    return get_venv_bin(venv_dir, 'python')
 
 def get_venv_pip(venv_dir: str):
-    if os.name == 'nt':  # Windows
-        return os.path.join(venv_dir, 'Scripts', 'pip')
-    else:  # Unix-based (Linux, macOS)
-        return os.path.join(venv_dir, 'bin', 'pip')
+    return get_venv_bin(venv_dir, 'pip')
+
+# Old versions (kept for reference), the OS check was duplicated:
+# def get_venv_python(venv_dir: str):
+#     if os.name == 'nt':  # Windows
+#         return os.path.join(venv_dir, 'Scripts', 'python')
+#     else:  # Unix-based (Linux, macOS)
+#         return os.path.join(venv_dir, 'bin', 'python')
+#
+# def get_venv_pip(venv_dir: str):
+#     if os.name == 'nt':  # Windows
+#         return os.path.join(venv_dir, 'Scripts', 'pip')
+#     else:  # Unix-based (Linux, macOS)
+#         return os.path.join(venv_dir, 'bin', 'pip')
 
 def create_venv(venv_dir: str):
     if not os.path.exists(venv_dir):
@@ -55,10 +67,10 @@ def run_python(venv_dir: str, py_script: str):
 #     if "-f" in args
 
 def main():
-    
-
     venv_dir = os.path.join(BASE_DIR, "venv")
-    create_venv(venv_dir) ; install_packages(venv_dir)
+    # create_venv(venv_dir) ; install_packages(venv_dir)  # old: two statements on one line
+    create_venv(venv_dir)
+    install_packages(venv_dir)
     sys.exit(run_python(venv_dir, os.path.join(BASE_DIR, "generator.py")))
 
 

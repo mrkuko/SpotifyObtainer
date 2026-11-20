@@ -1,7 +1,7 @@
 import json, os, re, sys
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from typing import NotRequired, TypedDict, Any
+from typing import TypedDict, Any
 import csv
 from dotenv import load_dotenv
 
@@ -47,17 +47,33 @@ def extract_playlist_id(value: str) -> str:
     return value.strip()
 
 
-def getAllTracks(user: spotipy.Spotify, limit_step=50):
+def _paginate(user: spotipy.Spotify, first_page) -> list[Track]:
     '''
-    Function to obtain all tracks saved in the current user's library ("Liked Songs").\n
-    returns list['href', 'items', 'limit', 'next', 'offset', 'previous', 'total']
+    Follows the "next" links of a paged Spotify response, starting from
+    first_page, and returns the items of all pages in one list.
+    Shared by getAllTracks and getPlaylistTracks (they had the same loop).
     '''
     tracks: list[Track] = []
-    response = user.current_user_saved_tracks(limit=limit_step)
+    response = first_page
     while response:
         tracks.extend(response["items"])
         response = user.next(response) if response.get("next") else None
     return tracks
+
+
+def getAllTracks(user: spotipy.Spotify, limit_step=50):
+    '''
+    Function to obtain all tracks saved in the current user's library ("Liked Songs").\n
+    returns list of saved-track items: {"added_at": ..., "track": {...}}
+    '''
+    # Old version (kept for reference), now handled by _paginate():
+    # tracks: list[Track] = []
+    # response = user.current_user_saved_tracks(limit=limit_step)
+    # while response:
+    #     tracks.extend(response["items"])
+    #     response = user.next(response) if response.get("next") else None
+    # return tracks
+    return _paginate(user, user.current_user_saved_tracks(limit=limit_step))
 
 
 def getPlaylistTracks(user: spotipy.Spotify, playlist_id: str, limit_step=100):
@@ -66,12 +82,14 @@ def getPlaylistTracks(user: spotipy.Spotify, playlist_id: str, limit_step=100):
     Works for public, private and collaborative playlists the authenticated
     user has access to.
     '''
-    tracks: list[Track] = []
-    response = user.playlist_items(playlist_id, limit=limit_step)
-    while response:
-        tracks.extend(response["items"])
-        response = user.next(response) if response.get("next") else None
-    return tracks
+    # Old version (kept for reference), now handled by _paginate():
+    # tracks: list[Track] = []
+    # response = user.playlist_items(playlist_id, limit=limit_step)
+    # while response:
+    #     tracks.extend(response["items"])
+    #     response = user.next(response) if response.get("next") else None
+    # return tracks
+    return _paginate(user, user.playlist_items(playlist_id, limit=limit_step))
 
 
 def to_cell(value: Any):
@@ -85,15 +103,17 @@ def to_cell(value: Any):
     return value
 
 
-def checks_attributes(tracks: list[Track]):
-    types: dict[str, set[str]] = {}
-    for track in tracks:
-        track_data: dict[str,Any] = track["track"];
-        for k, v in track_data.items():
-            if k not in types:
-                types[k] = set()
-            types[k].add(type(v))
-    return types
+# Debug helper, never called anywhere (was used to find out which Python
+# types each API field has, which is how TrackItem above was written).
+# def checks_attributes(tracks: list[Track]):
+#     types: dict[str, set[str]] = {}
+#     for track in tracks:
+#         track_data: dict[str,Any] = track["track"];
+#         for k, v in track_data.items():
+#             if k not in types:
+#                 types[k] = set()
+#             types[k].add(type(v))
+#     return types
 
 
 def main():
