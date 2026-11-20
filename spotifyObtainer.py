@@ -1,6 +1,9 @@
 import os,subprocess,sys,venv,sys
 
 PACKAGES = ["spotipy", "python-dotenv"]
+# All paths are resolved relative to this file, not the current directory,
+# so the script works no matter where it is launched from.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FLAGS: int = 0;
 
 # Determine the correct path based on the OS
@@ -41,9 +44,9 @@ def run_python(venv_dir: str, py_script: str):
 def main():
     
 
-    venv_dir = os.path.join(os.getcwd(), "venv");
+    venv_dir = os.path.join(BASE_DIR, "venv")
     create_venv(venv_dir) ; install_packages(venv_dir)
-    sys.exit(run_python(venv_dir, "generator.py"))
+    sys.exit(run_python(venv_dir, os.path.join(BASE_DIR, "generator.py")))
 
 
 if __name__ == "__main__":

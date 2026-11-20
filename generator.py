@@ -6,6 +6,10 @@ import csv
 from dotenv import load_dotenv
 
 
+# .env and the spotipy token cache live next to this file, not in the cwd.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 class TrackItem(TypedDict):
     album: dict
     artists: list
@@ -82,11 +86,11 @@ def checks_attributes(tracks: list[Track]):
 
 
 def main():
-    load_dotenv()
+    load_dotenv(os.path.join(BASE_DIR, ".env"))
     # user-library-read is needed for "Liked Songs", the playlist-read-*
     # scopes are needed to read private/collaborative playlists by link.
     scope = "user-library-read playlist-read-private playlist-read-collaborative"
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, client_id=os.getenv('SPOTIPY_CLIENT_ID'),client_secret=os.getenv('SPOTIPY_CLIENT_SECRET'),redirect_uri=os.getenv('SPOTIPY_REDIRECT_URI')))
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, client_id=os.getenv('SPOTIPY_CLIENT_ID'),client_secret=os.getenv('SPOTIPY_CLIENT_SECRET'),redirect_uri=os.getenv('SPOTIPY_REDIRECT_URI'),cache_path=os.path.join(BASE_DIR, ".cache")))
 
     # Optional first CLI argument: playlist link, spotify:playlist:<id> URI or bare id.
     # If omitted, falls back to the user's saved tracks ("Liked Songs").
