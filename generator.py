@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 from spotipy.oauth2 import SpotifyOAuth
 
 
+# Project version, https://semver.org (0.x: the output format can still
+# change). Keep in sync with the git tag and CHANGELOG.md.
+__version__ = "0.3.0"
+
 # .env and the spotipy token cache live next to this file, not in the cwd.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -236,7 +240,10 @@ def write_csv(stream, item_type: type, rows: list[dict]):
 
 def parse_args(argv: list[str]):
     parser = argparse.ArgumentParser(
+        prog="spotifyObtainer",
         description="Export Liked Songs or a playlist to CSV (stdout).")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "playlist", nargs="?",
         help="playlist link, spotify:playlist:<id> URI or bare id "
