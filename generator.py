@@ -40,16 +40,38 @@ class Track(TypedDict):
     track: TrackItem
 
 
+# Spotify ids are 22 characters of base62 (letters and digits).
+PLAYLIST_ID = r"[0-9A-Za-z]{22}"
+PLAYLIST_PATTERNS = [
+    # bare id
+    re.compile(rf"({PLAYLIST_ID})"),
+    # spotify:playlist:<id> (and the old spotify:user:<name>:playlist:<id>)
+    re.compile(rf"spotify:(?:user:[^:]+:)?playlist:({PLAYLIST_ID})"),
+    # https://open.spotify.com/[intl-xx/]playlist/<id>[?si=...]
+    re.compile(r"https?://open\.spotify\.com/(?:intl-[a-z]{2}(?:-[a-z]+)?/)?"
+               rf"playlist/({PLAYLIST_ID})(?:[/?#].*)?"),
+]
+
+
 def extract_playlist_id(value: str) -> str:
     '''
     Accepts a bare playlist id, a Spotify URI (spotify:playlist:<id>)
     or an open.spotify.com playlist link (with or without query params)
     and returns the bare playlist id.
+    Raises ValueError for anything else (album/track links, typos, ...).
     '''
-    match = re.search(r"playlist[/:]([a-zA-Z0-9]+)", value)
-    if match:
-        return match.group(1)
-    return value.strip()
+    # Old version (kept for reference): accepted anything, so an album link
+    # or a typo went to the API as-is and ended in a confusing 404.
+    # match = re.search(r"playlist[/:]([a-zA-Z0-9]+)", value)
+    # if match:
+    #     return match.group(1)
+    # return value.strip()
+    value = value.strip()
+    for pattern in PLAYLIST_PATTERNS:
+        match = pattern.fullmatch(value)
+        if match:
+            return match.group(1)
+    raise ValueError(f"not a Spotify playlist id, URI or link: {value!r}")
 
 
 def _paginate(user: spotipy.Spotify, first_page) -> list[Track]:
@@ -147,7 +169,16 @@ def main():
     playlist_arg = sys.argv[1] if len(sys.argv) > 1 else None
 
     if playlist_arg:
-        tracks = get_playlist_tracks(sp, extract_playlist_id(playlist_arg))
+        try:
+            playlist_id = extract_playlist_id(playlist_arg)
+        except ValueError as error:
+            print(f"error: {error}", file=sys.stderr)
+            print("expected: a playlist link "
+                  "(https://open.spotify.com/playlist/<id>), a "
+                  "spotify:playlist:<id> URI or a 22-character id",
+                  file=sys.stderr)
+            sys.exit(2)
+        tracks = get_playlist_tracks(sp, playlist_id)
     else:
         tracks = get_all_tracks(sp)
 
